@@ -1,4 +1,3 @@
-// Include Libraries
 #include <WiFi.h>
 #include <esp_now.h>
 #include <TFT_eSPI.h>  // Graphics and font library for ST7735 driver chip
@@ -22,58 +21,41 @@ int progress = 0;
 bool redrawProgress = true;
 int lastRedrawTime = 0;
 
-//we could also use xSemaphoreGiveFromISR and its associated fxns, but this is fine
-volatile bool scheduleCmdAsk = true;
-hw_timer_t *askRequestTimer = NULL;
-volatile bool askExpired = false;
-hw_timer_t *askExpireTimer = NULL;
-int expireLength = 25;
-
-int lineHeight = 30;
-
-// Define LED and pushbutton pins
+// Button and ESP-NOW related setup
 #define BUTTON_LEFT 0
 #define BUTTON_RIGHT 35
+#define BUTTON_PIN 2 // External Button
+#define POTENTIOMETER_PIN 13
 
 void formatMacAddress(const uint8_t *macAddr, char *buffer, int maxLength)
-// Formats MAC Address
 {
   snprintf(buffer, maxLength, "%02x:%02x:%02x:%02x:%02x:%02x", macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5]);
 }
 
 void receiveCallback(const esp_now_recv_info_t *macAddr, const uint8_t *data, int dataLen)
 {
-  // Only allow a maximum of 250 characters in the message + a null terminating byte
   char buffer[ESP_NOW_MAX_DATA_LEN + 1];
   int msgLen = min(ESP_NOW_MAX_DATA_LEN, dataLen);
   strncpy(buffer, (const char *)data, msgLen);
 
-  // Make sure we are null terminated
   buffer[msgLen] = 0;
   String recvd = String(buffer);
-  Serial.println(recvd);
-  // Format the MAC address
+  
   char macStr[18];
 
-  // Send Debug log message to the serial port
-  Serial.printf("Received message from: %s \n%s\n", macStr, buffer);
-  if (recvd[0] == 'A' && cmdRecvd == waitingCmd && random(100) < 30)  //only take an ask if you don't have an ask already and only take it XX% of the time
-  {
-    recvd.remove(0, 3);
-    cmdRecvd = recvd;
-    redrawCmdRecvd = true;
-    timerStart(askExpireTimer);  //once you get an ask, a timer starts
-  }
-  else if (recvd[0] == 'D' && recvd.substring(3) == cmdRecvd) {
-    timerWrite(askExpireTimer, 0);
-    timerStop(askExpireTimer);
-    cmdRecvd = waitingCmd;
-    progress = progress + 1;
-    broadcast("P: " + String(progress));
-    redrawCmdRecvd = true;
-
-  }
-  else if (recvd[0] == 'P') {
+  if (recvd[0] == 'D') {  // This is a command to reduce health or modify stats
+    // If the received command is related to an attack, apply the attack
+    if (recvd.substring(3) == "A") {
+      // Assume the other player is attacking, reduce their health
+      health -= 10;  // Decrease health by 10
+      if (health < 0) health = 0;  // Ensure health doesn't go below 0
+      redrawControls();  // Redraw the controls to update health
+    } else if (recvd.substring(3) == "B") {
+      // Handle another attack type
+      attackStrength += 1;  // Example logic for another type of attack
+      redrawControls();  // Redraw to show updated attack strength
+    }
+  } else if (recvd[0] == 'P') {  // Update progress
     recvd.remove(0, 3);
     progress = recvd.toInt();
     redrawProgress = true;
@@ -92,56 +74,75 @@ void sentCallback(const uint8_t *macAddr, esp_now_send_status_t status)
 
 void broadcast(const String &message)
 {
-  // Broadcast a message to every device in range
   uint8_t broadcastAddress[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
   esp_now_peer_info_t peerInfo = {};
   memcpy(&peerInfo.peer_addr, broadcastAddress, 6);
   if (!esp_now_is_peer_exist(broadcastAddress)) {
     esp_now_add_peer(&peerInfo);
   }
-  // Send message
-  esp_err_t result = esp_now_send(broadcastAddress, (const uint8_t *)message.c_str(), message.length());
+  esp_now_send(broadcastAddress, (const uint8_t *)message.c_str(), message.length());
 }
 
 void IRAM_ATTR sendCmd1() {
-  health -= 10;  // Decrease health by 10
-  if (health < 0) health = 0;  // Ensure health doesn't go below 0
+  String cmd1 = "D: A";  // Example: Attack command to the other player
   scheduleCmd1Send = true;
-  redrawControls(); // Redraw the controls to update the health on the screen
+  broadcast(cmd1);  // Send the attack command to the other player
+  int potVal = analogRead(POTENTIOMETER_PIN);
+  energy -= 1;
+  redrawControls(); // Redraw the controls
 }
 
 void IRAM_ATTR sendCmd2() {
-  // Cycle impact between 100, 200, and 300
-  attackStrength += 1;
-  scheduleCmd2Send = true; // Trigger sending the updated command
-  redrawControls(); // Redraw to show updated impact value
+  String cmd2 = "D: B";  // Another type of attack command
+  scheduleCmd2Send = true;
+  broadcast(cmd2);  // Send the attack command to the other player
+  redrawControls(); // Redraw the controls
 }
 
+void buttonSetup() {
+  pinMode(BUTTON_LEFT, INPUT);
+  pinMode(BUTTON_RIGHT, INPUT);
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
 
-void IRAM_ATTR onAskReqTimer() {
-  scheduleCmdAsk = true;
+  attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), sendCmd1, FALLING);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_RIGHT), sendCmd2, FALLING);
 }
 
-void IRAM_ATTR onAskExpireTimer() {
-  askExpired = true;
-  timerStop(askExpireTimer);
-  timerWrite(askExpireTimer, 0);
+void textSetup() {
+  tft.init();
+  tft.setRotation(0);
+  tft.setTextSize(1);
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextColor(TFT_GREEN, TFT_BLACK);
+  drawControls();
+}
+
+void drawControls() {
+  tft.drawString("Health: " + String(health), 0, 90, 2);
+  tft.drawString("Energy: " + String(energy), 0, 110, 2);
+  tft.drawString("Impact: " + String(attackStrength), 0, 130, 2);
+}
+
+void redrawControls() {
+  tft.fillRect(0, 90, 128, 20, TFT_BLACK);  // Clear the health area
+  tft.fillRect(0, 130, 128, 20, TFT_BLACK);  // Clear the impact area
+  drawControls();  // Redraw all controls
+}
+
+void setup() {
+  Serial.begin(115200);
+  textSetup();
+  buttonSetup();
+  espnowSetup();
 }
 
 void espnowSetup() {
-  // Set ESP32 in STA mode to begin with
   delay(500);
   WiFi.mode(WIFI_STA);
   Serial.println("ESP-NOW Broadcast Demo");
 
-  // Print MAC address
-  Serial.print("MAC Address: ");
-  Serial.println(WiFi.macAddress());
-
-  // Disconnect from WiFi
   WiFi.disconnect();
 
-  // Initialize ESP-NOW
   if (esp_now_init() == ESP_OK) {
     Serial.println("ESP-NOW Init Success");
     esp_now_register_recv_cb(receiveCallback);
@@ -153,68 +154,7 @@ void espnowSetup() {
   }
 }
 
-void buttonSetup() {
-  pinMode(BUTTON_LEFT, INPUT);
-  pinMode(BUTTON_RIGHT, INPUT);
-
-  attachInterrupt(digitalPinToInterrupt(BUTTON_LEFT), sendCmd1, FALLING);
-  attachInterrupt(digitalPinToInterrupt(BUTTON_RIGHT), sendCmd2, FALLING);
-}
-
-void textSetup() {
-  tft.init();
-  tft.setRotation(0);
-
-  tft.setTextSize(1);
-  tft.fillScreen(TFT_BLACK);
-  tft.setTextColor(TFT_GREEN, TFT_BLACK);
-  drawControls();
-
-  cmdRecvd = waitingCmd;
-  redrawCmdRecvd = true;
-}
-
-void timerSetup() {
-  // https://espressif-docs.readthedocs-hosted.com/projects/arduino-esp32/en/latest/api/timer.html
-  askRequestTimer = timerBegin(1000000); // 1MHz
-  timerAttachInterrupt(askRequestTimer, &onAskReqTimer);
-  timerAlarm(askRequestTimer, 5 * 1000000, true, 0);  //send out an ask every 5 secs
-
-  askExpireTimer = timerBegin(80000000);
-  timerAttachInterrupt(askExpireTimer, &onAskExpireTimer);
-  timerAlarm(askExpireTimer, expireLength * 1000000, true, 0);
-  timerStop(askExpireTimer);
-}
-
-void setup() {
-  Serial.begin(115200);
-
-  textSetup();
-  buttonSetup();
-  espnowSetup();
-  timerSetup();
-}
-
-String genCommand() {
-  return "Test";
-}
-
-// Function to redraw only the parts of the screen that are changing
-void redrawControls() {
-  tft.fillRect(0, 90, 128, 20, TFT_BLACK);  // Clear the health area
-  tft.fillRect(0, 130, 128, 20, TFT_BLACK);  // Clear the impact area
-  drawControls();  // Redraw all controls
-}
-
-void drawControls() {
-  // Drawing the current local player stats
-  tft.drawString("Health: " + String(health), 0, 90, 2);  // Display health value
-  tft.drawString("Energy: " + String(energy), 0, 110, 2); // Display energy value
-  tft.drawString("Impact: " + String(attackStrength), 0, 130, 2);  // Display impact value
-}
-
 void loop() {
-
   if (scheduleCmd1Send) {
     broadcast("D: " + cmd1);
     scheduleCmd1Send = false;
@@ -223,25 +163,14 @@ void loop() {
     broadcast("D: " + cmd2);
     scheduleCmd2Send = false;
   }
-  if (scheduleCmdAsk) {
-    String cmdAsk = random(2) ? cmd1 : cmd2;
-    broadcast("A: " + cmdAsk);
-    scheduleCmdAsk = false;
-  }
-  if (askExpired) {
-    progress = max(0, progress - 1);
-    broadcast(String(progress));
-    cmdRecvd = waitingCmd;
-    redrawCmdRecvd = true;
-    askExpired = false;
-  }
 
-  if ((millis() - lastRedrawTime) > 50) {
-    lastRedrawTime = millis();
+  if (cmdRecvd == waitingCmd) {
+    redrawCmdRecvd = false;
+    redrawProgress = false;
   }
 
   if (redrawCmdRecvd || redrawProgress) {
     redrawCmdRecvd = false;
     redrawProgress = false;
-  }  
+  }
 }
