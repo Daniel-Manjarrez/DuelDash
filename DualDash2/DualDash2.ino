@@ -2,24 +2,9 @@
 #include <esp_now.h>
 #include <TFT_eSPI.h>  // Graphics and font library for ST7735 driver chip
 #include <SPI.h>
-// #include <Adafruit_PN532.h>
 #include <Wire.h>
 
-// Define the interface type
-// #if 0
-// #include <PN532_SPI.h>
-// #include "PN532.h"
-// PN532_SPI pn532spi(SPI, 10);
-// PN532 nfc(pn532spi);
-
-// #elif 0
-// #include <PN532_HSU.h>
-// #include <PN532.h>
-// PN532_HSU pn532hsu(Serial1);
-// PN532 nfc(pn532hsu);
-
-// #else
-// #include <Wire.h>
+// NFC reader Code
 #include <PN532_I2C.h>
 #include <PN532.h>
 #include <NfcAdapter.h>
@@ -35,11 +20,9 @@ TFT_eSPI tft = TFT_eSPI();
 
 SemaphoreHandle_t mutex;  // Declare a mutex handle
 
-// NFC reader configuration 
-// #define SDA_PIN 21
-// #define SCL_PIN 22
-// Adafruit_PN532 nfc(SDA_PIN, SCL_PIN);
-
+// Constants
+#define SHORT_PRESS_TIME 500  // 500 milliseconds
+#define LONG_PRESS_TIME  3000 // 3000 milliseconds
 // Hardware pins
 #define BUTTON_LEFT 0
 #define BUTTON_RIGHT 35
@@ -58,6 +41,13 @@ Avatar avatars[] = {
     {{0, 0, 0, 0, 0, 0, 0}, 100}   // Avatar 3 with 100 health
 };
 
+// Button states
+int lastLeftState = LOW;  // the previous state from the input pin
+int lastRightState = LOW;
+int lastButtonState = LOW;
+unsigned long pressedTime  = 0;
+unsigned long releasedTime = 0;
+
 uint8_t zeroArr[7] = {0};
 
 struct AttackMessage {
@@ -66,14 +56,16 @@ struct AttackMessage {
 };
 
 // Game variables
-int currAvatarHealth = avatars[0].health;   // Player's total energy
-int energy = 100;                       // Player's energy
-int attackPower = 0;                    // Current attack power
-// int avatarHealth = 100;                 // Health of the selected avatar
-int maxAttackPower = 20;                // Maximum attack power allowed
-bool buttonPressed = false;             // Button state
-String currentTag = "None";             // Current NFC tag ID
-int currAvatarInd = -1;
+int currAvatarHealth = avatars[0].health; // Player's total energy
+int energy = 100;                         // Player's energy
+bool buttonPressed = false;               // Button state
+int currAvatarInd = -1;                   // Current Avatar Selected
+
+int attackPowerArr[3] = {5, 25, 50};
+int energyUsage[3] = {1, 15, 30};
+int attackEnergyPairInd = 0;
+
+int attackPower = attackPowerArr[attackEnergyPairInd];  // Current attack power
 
 enum ScreenState {
   GAME_SCREEN,
@@ -89,6 +81,7 @@ enum WinState {
 ScreenState currentScreen = GAME_SCREEN;
 WinState endScreenState = PLAYER_NONE;
 volatile bool connected = false;
+int prevTime;
 
 // Draw & Control Handle Related Functions
 // For Screen
@@ -98,31 +91,20 @@ void handleGameScreen();
 void drawWinScreen();
 void handleWinScreen();
 
-
-// int getAvatarIndex(String tagID) {
-//     for (int i = 0; i < 3; i++) {
-//         if (avatars[i].tagID == tagID) {
-//             return i; // Return index of the active avatar
-//         }
-//     }
-//     return -1; // No matching avatar
-// }
-
 void sendAttackRequest() {
   String cmd1 = "D: A";  // Example: Attack command to the other player
+  energy = max(0, energy - energyUsage[attackEnergyPairInd]);
   broadcast(cmd1);  // Send the attack command to the other player
-  // int potVal = analogRead(POTENTIOMETER_PIN);
-  energy -= 1;
-  updateDisplay();
+  Serial.println("Sent an attack request!");
+  tft.fillScreen(TFT_BLACK);
 }
 
 void sendBoostRequest() {
   return;
 }
 
-
 void receiveCallback(const esp_now_recv_info_t *info, const uint8_t *data, int dataLen) {
-  if (xSemaphoreTake(mutex, portMAX_DELAY)) {  // Take the mutex
+  // if (xSemaphoreTake(mutex, portMAX_DELAY)) {  // Take the mutex
     char buffer[ESP_NOW_MAX_DATA_LEN + 1];
     int msgLen = min(ESP_NOW_MAX_DATA_LEN, dataLen);
     strncpy(buffer, (const char *)data, msgLen);
@@ -135,33 +117,26 @@ void receiveCallback(const esp_now_recv_info_t *info, const uint8_t *data, int d
     if (recvd[0] == 'D') {  // This is a command to reduce health or modify stats
       // If the received command is related to an attack, apply the attack
       if (recvd.substring(3) == "A") {
+        Serial.println("Received an attack!");
         // Assume the other player is attacking, reduce their health
-        currAvatarHealth -= 10;  // Decrease health by 10
-        if (currAvatarHealth < 0) currAvatarHealth = 0;  // Ensure health doesn't go below 0
-        
-        // redrawControls();  // Redraw the controls to update health
+        avatars[currAvatarInd].health -= attackPower;  // Decrease health by 10
+        if (avatars[currAvatarInd].health  < 0) avatars[currAvatarInd].health  = 0;  // Ensure health doesn't go below 0
         tft.fillScreen(TFT_BLACK);
-        updateDisplay();
       } else if (recvd.substring(3) == "B") {
         // Handle another attack type
         // attackStrength += 1;  // Example logic for another type of attack
         // redrawControls();  // Redraw to show updated attack strength
         tft.fillScreen(TFT_BLACK);
-        updateDisplay();
       }
     }
-    // } else if (recvd[0] == 'P') {  // Update progress
-    //   recvd.remove(0, 3);
-    //   progress = recvd.toInt();
-    //   redrawProgress = true;
-    // }
-    xSemaphoreGive(mutex);
-  }
+    // xSemaphoreGive(mutex);
+  // }
   delay(100);
 }
 
 void sentCallback(const uint8_t *macAddr, esp_now_send_status_t status) {
   // Optional: Handle send status
+  Serial.println("ESP32 broadcasted a message!");
   return;
 }
 
@@ -208,17 +183,6 @@ void textSetup() {
   tft.setTextSize(2);
 }
 
-void nfcReaderSetup() {
-  // Initialize NFC reader
-  nfc.begin();
-  uint32_t versiondata = nfc.getFirmwareVersion();
-  if (!versiondata) {
-    Serial.println("Didn't find PN53x board");
-    while (1);
-  }
-  nfc.SAMConfig();
-}
-
 void buttonSetup() {
   // Initialize hardware pins
   pinMode(BUTTON_PIN, INPUT_PULLUP);
@@ -228,10 +192,10 @@ void buttonSetup() {
 void setup() {
   Serial.begin(115200);
 
+  prevTime = millis();
   textSetup();
   buttonSetup();
   espnowSetup();
-  nfcReaderSetup();
 
 }
 
@@ -242,8 +206,12 @@ void readNFCTag() {
   // UID size (4 or 7 bytes depending on card type)
   uint8_t uidLength;
 
-  while (!connected) {
-    connected = connect();
+  // while (!connected) {
+  connected = connect();
+  // }
+
+  if (connected == false) {
+    return;
   }
 
   // Wait for an ISO14443A type cards (Mifare, etc.).  When one is found
@@ -269,20 +237,19 @@ void readNFCTag() {
     for (int i = 0; i < 3; i++) {
       if (memcmp(avatars[i].tagID, uid, 7) == 0) {
         currAvatarHealth = avatars[i].health;
-        currentTag = "Avatar " + String(i);
         currAvatarInd = i;
         Serial.println("Tag is already filled in the tag set");
         tagFilled = true;
+        tft.fillScreen(TFT_BLACK);
         break;
       }
       else if (memcmp(avatars[i].tagID, zeroArr, 7) == 0) {
-        // avatars[i].tagID = uid;
         memcpy(avatars[i].tagID, uid, 7);
         currAvatarHealth = avatars[i].health;
-        currentTag = "Avatar " + String(i);
         currAvatarInd = i;
         Serial.println("Tag is being filled in the tag set!");
         tagFilled = true;
+        tft.fillScreen(TFT_BLACK);
         break;
       }
     }
@@ -291,111 +258,12 @@ void readNFCTag() {
       Serial.println("The tag set is fully occupied!");
     }
     
-    delay(1000);
-    connected = connect();
+    connected = false;
   }
   else
   {
     // PN532 probably timed out waiting for a card
     Serial.println("Timed out waiting for a card");
-  }
-}
-
-// Function to execute an attack
-void executeAttack() {
-    if (energy >= attackPower) {
-        // int avatarIndex = getAvatarIndex(currentTag);
-        // if (avatarIndex != -1) {
-        //     avatars[avatarIndex].health -= attackPower;
-        //     if (avatars[avatarIndex].health < 0) {
-        //         avatars[avatarIndex].health = 0; // Prevent negative health
-        //     }
-        //     energy -= attackPower;
-
-        //     Serial.print("Avatar ");
-        //     Serial.print(avatars[avatarIndex].tagID);
-        //     Serial.print(" hit! Remaining Health: ");
-        //     Serial.println(avatars[avatarIndex].health);
-        // } else {
-        //     Serial.println("No active avatar selected!");
-        // }
-
-        sendAttackRequest();
-        
-        // Feedback
-        // digitalWrite(LED_PIN, HIGH);
-        // delay(100);
-        // digitalWrite(LED_PIN, LOW);
-    } else {
-        Serial.println("Not enough energy!");
-    }
-}
-
-// Function to update the display
-void updateDisplay() {
-    tft.fillScreen(TFT_BLACK); // Clear the screen
-    tft.setCursor(10, 10);
-    tft.print("Energy: ");
-    tft.println(energy);
-
-    tft.setCursor(10, 40);
-    tft.print("Attack Power: ");
-    tft.println(attackPower);
-
-    for (int i = 0; i < 3; i++) {
-        tft.setCursor(10, 70 + (i * 30)); // Offset each avatar
-        tft.print("Avatar ");
-        tft.print(i + 1);
-        tft.print(" Health: ");
-        tft.println(avatars[i].health);
-    }
-
-    tft.setCursor(10, 160);
-    tft.print("Active Tag: ");
-    tft.println(currentTag);
-}
-
-bool checkGameOver() {
-    bool playerLost = true;
-
-    // Check if the player lost (all avatars' health <= 0)
-    for (int i = 0; i < 3; i++) {
-        if (avatars[i].health > 0) {
-            playerLost = false;
-            break;
-        }
-    }
-
-    // If player lost
-    if (playerLost) {
-        // drawWinScreen("Opponent Wins!");
-        // sendGameOver();  // Inform the opponent
-        return true;
-    }
-
-    return false;
-}
-
-// Function to receive an attack from another player
-void receiveAttack(int opponentAttackPower) {
-  // Subtract the attack power from the player's health
-  currAvatarHealth -= opponentAttackPower;
-  
-  // Make sure health does not go below 0
-  if (currAvatarHealth < 0) {
-    currAvatarHealth = 0;
-  }
-  
-  // Print updated health for debugging purposes
-  Serial.print("Player's Health: ");
-  Serial.println(currAvatarHealth);
-  
-  // Check if player is defeated
-  if (currAvatarHealth == 0) {
-    // Trigger player defeat logic
-    checkGameOver();
-    Serial.println("Player is defeated!");
-    // Call function to end the game or update display accordingly
   }
 }
 
@@ -405,7 +273,7 @@ bool connect() {
 
   // Connected, show version
   uint32_t versiondata = nfc.getFirmwareVersion();
-  if (! versiondata)
+  if (!versiondata)
   {
     Serial.println("PN53x card not found!");
     return false;
@@ -419,7 +287,7 @@ bool connect() {
   // Set the max number of retry attempts to read from a card
   // This prevents us from waiting forever for a card, which is
   // the default behaviour of the PN532.
-  nfc.setPassiveActivationRetries(0xFF);
+  nfc.setPassiveActivationRetries(0x11);
 
   // configure board to read RFID tags
   nfc.SAMConfig();
@@ -430,52 +298,146 @@ bool connect() {
   return true;
 }
 
-void handleGameScreen() {
+void detectInputs(){
+  // Potentiometer isn't working so can't test this code
+  // out even though it theoretically works :(
   // int potValue = analogRead(POTENTIOMETER_PIN);
-  // attackPower = map(potValue, 0, 4095, 1, maxAttackPower);
-
-  // if (digitalRead(BUTTON_PIN) == LOW) {
-  //   buttonPressed = true;
-  //   executeAttack();
+  // int atkVal = map(potValue, 0, 4095, 1, maxAttackPower);
+  // Serial.println("Potentiometer value is: " + String(potValue));
+  // Serial.println("Attack value is " + String(atkVal));
+  
+  // if (attackPower != atkVal) {
+  //   attackPower = atkVal;
+  //   tft.fillScreen(TFT_BLACK);
+  //   Serial.println("Potentiometer Value has changed.");
   // }
 
-  readNFCTag();
+  int currentLeftState = digitalRead(BUTTON_LEFT);
+  // Detect left button press
+  if (lastLeftState == HIGH && currentLeftState == LOW)       // button is pressed
+    pressedTime = millis();
+  else if (lastLeftState == LOW && currentLeftState == HIGH) { // button is released
+    releasedTime = millis();
+    long pressDuration = releasedTime - pressedTime;
 
-  // updateDisplay();
+    if ( pressDuration < SHORT_PRESS_TIME && currAvatarInd != -1) {
+      // TODO Send Attack Request
+      Serial.println("Left Button Short Press");
+      sendAttackRequest();
+    }
+
+    if ( pressDuration > LONG_PRESS_TIME ){
+      lastLeftState = currentLeftState;
+      Serial.println("Left Button Long Press");
+      return;
+    }
+  }
+
+  lastLeftState = currentLeftState;
+
+  int currentRightState = digitalRead(BUTTON_RIGHT);
+
+  // Detect right button press
+  if (lastRightState == HIGH && currentRightState == LOW)       // button is pressed
+    pressedTime = millis();
+  else if (lastRightState == LOW && currentRightState == HIGH) { // button is released
+    releasedTime = millis();
+    long pressDuration = releasedTime - pressedTime;
+
+    if ( pressDuration < SHORT_PRESS_TIME ) {
+      currAvatarInd = (currAvatarInd + 1) % 3;
+      tft.fillScreen(TFT_BLACK);
+      Serial.println("Right Button Short Press");
+    }
+
+    if ( pressDuration > LONG_PRESS_TIME ){
+      lastRightState = currentRightState;
+      Serial.println("Right Button Long Press");
+      attackEnergyPairInd = (attackEnergyPairInd + 1) % 3;
+      attackPower = attackPowerArr[attackEnergyPairInd];
+      tft.fillScreen(TFT_BLACK);
+      return;
+    }
+  }
+  lastRightState = currentRightState;
+
+  int buttonState = digitalRead(BUTTON_PIN);
+  // Detect right button press
+  if (lastButtonState == HIGH && buttonState == LOW)       // button is pressed
+    pressedTime = millis();
+  else if (lastButtonState == LOW && buttonState == HIGH) { // button is released
+    releasedTime = millis();
+    long pressDuration = releasedTime - pressedTime;
+
+    if ( pressDuration < SHORT_PRESS_TIME ) {
+      Serial.println("Button Pin Short Press");
+      sendAttackRequest();
+    }
+    else if ( pressDuration > LONG_PRESS_TIME) {
+      lastButtonState = buttonState;
+      Serial.println("Button Pin Long Press");
+      attackEnergyPairInd = (attackEnergyPairInd + 1) % 3;
+      attackPower = attackPowerArr[attackEnergyPairInd];
+      tft.fillScreen(TFT_BLACK);
+      return;
+    }
+  }
+  lastButtonState = buttonState;
+}
+
+void handleGameScreen() {
+  drawGameScreen();
+  detectInputs();
+  // int currTime = millis();
+  // if (currTime - prevTime > 1000) {
+  //   readNFCTag();
+  //   prevTime = currTime;
+  // }
+}
+
+void drawGameScreen() {
+    int16_t cursorX = 10;
+    int16_t cursorY = 10;
+    tft.setCursor(cursorX, cursorY);
+    tft.print("Energy: ");
+    tft.println(energy);
+
+    cursorY += 30;
+
+    tft.setCursor(cursorX, cursorY);
+    tft.print("Attack Power: ");
+    tft.println(attackPower);
+
+    cursorY += 30;
+
+    tft.setCursor(cursorX, cursorY);
+    if (currAvatarInd != -1 ) { 
+      tft.print("Current Avatar: A" + String(currAvatarInd) + "\n");
+      cursorY += 30;
+      tft.setCursor(cursorX, cursorY);
+      tft.print("Avatar Health: " + String(avatars[currAvatarInd].health));
+    }
+    else {
+      tft.print("No Avatar Selected\n");
+    }
 }
 
 void loop() {
-  /*
-  checkGameOver();
-
-  // Read potentiometer value
-  int potValue = analogRead(POTENTIOMETER_PIN);
-  attackPower = map(potValue, 0, 4095, 1, maxAttackPower);
-
-  // Check if button is pressed
-  if (digitalRead(BUTTON_PIN) == LOW) {
-    buttonPressed = true;
-    executeAttack();
+  switch (currentScreen) {
+    case GAME_SCREEN:
+      // Game logic here
+      handleGameScreen();
+      // TODO: Handle Game Over Logic Here If Player's Avatar HP is <= 0 or Energy <= 0
+      // TODO: If game over, change currentScreen variable to END_SCREEN
+      // TODO: Game Over Logic should broadcast a message saying that Player
+      // TODO: Lost, so that other Player know they Won.
+      // TODO: Do this in a function called checkGameOver() with functions
+      // TODO: like drawGameOver(), and (optionally; not needed in time for presentation
+      // TODO: ) sendGameOver() contained inside.
+      break;
+    case END_SCREEN:
+      // handleWinScreen(); // To be written
+      break;
   }
-
-  // Read NFC tag
-  readNFCTag();
-
-  // Update display
-  updateDisplay();
-  */
-
-  // if (xSemaphoreTake(mutex, portMAX_DELAY)) {  // Take the mutex
-    switch (currentScreen) {
-      case GAME_SCREEN:
-        // Game logic here
-        handleGameScreen();
-        break;
-      case END_SCREEN:
-        // handleWinScreen(); // To be written
-        break;
-    }
-    // xSemaphoreGive(mutex);
-  // }
   delay(100);
 }
