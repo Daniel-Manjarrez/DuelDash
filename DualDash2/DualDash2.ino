@@ -388,11 +388,11 @@ void detectInputs(){
 void handleGameScreen() {
   drawGameScreen();
   detectInputs();
-  // int currTime = millis();
-  // if (currTime - prevTime > 1000) {
-  //   readNFCTag();
-  //   prevTime = currTime;
-  // }
+  int currTime = millis();
+  if (currTime - prevTime > 1000) {
+    readNFCTag();
+    prevTime = currTime;
+  }
 }
 
 void drawGameScreen() {
