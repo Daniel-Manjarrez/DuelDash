@@ -18,7 +18,7 @@ TFT_eSPI tft = TFT_eSPI();
 #define TFT_BLACK 0x0000
 #define TFT_WHITE 0xFFFF
 
-SemaphoreHandle_t mutex;  // Declare a mutex handle
+// SemaphoreHandle_t mutex;  // Declare a mutex handle
 
 // Constants
 #define SHORT_PRESS_TIME 500  // 500 milliseconds
@@ -61,7 +61,7 @@ int energy = 100;                         // Player's energy
 bool buttonPressed = false;               // Button state
 int currAvatarInd = -1;                   // Current Avatar Selected
 
-int attackPowerArr[3] = {5, 25, 50};
+int attackPowerArr[3] = {5, 20, 40};
 int energyUsage[3] = {1, 15, 30};
 int attackEnergyPairInd = 0;
 
@@ -92,7 +92,7 @@ void drawWinScreen();
 void handleWinScreen();
 
 void sendAttackRequest() {
-  String cmd1 = "D: A";  // Example: Attack command to the other player
+  String cmd1 = "D: A" + String(attackPower);  // Example: Attack command to the other player
   energy = max(0, energy - energyUsage[attackEnergyPairInd]);
   broadcast(cmd1);  // Send the attack command to the other player
   Serial.println("Sent an attack request!");
@@ -116,10 +116,10 @@ void receiveCallback(const esp_now_recv_info_t *info, const uint8_t *data, int d
 
     if (recvd[0] == 'D') {  // This is a command to reduce health or modify stats
       // If the received command is related to an attack, apply the attack
-      if (recvd.substring(3) == "A") {
+      if (recvd.substring(3, 4) == "A") {
         Serial.println("Received an attack!");
         // Assume the other player is attacking, reduce their health
-        avatars[currAvatarInd].health -= attackPower;  // Decrease health by 10
+        avatars[currAvatarInd].health -= recvd.substring(4).toInt();  // Decrease health by 10
         if (avatars[currAvatarInd].health  < 0) avatars[currAvatarInd].health  = 0;  // Ensure health doesn't go below 0
         tft.fillScreen(TFT_BLACK);
       } else if (recvd.substring(3) == "B") {
@@ -389,7 +389,7 @@ void handleGameScreen() {
   drawGameScreen();
   detectInputs();
   int currTime = millis();
-  if (currTime - prevTime > 1000) {
+  if (currTime - prevTime > 3000) {
     readNFCTag();
     prevTime = currTime;
   }
