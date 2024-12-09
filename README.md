@@ -41,3 +41,6 @@ You can take an in depth look at our process making this device and program in t
 ## Contributors
 
 - Daniel Manjarrez
+- Mahdi Ali-Raihan
+- Enrista Ilo
+- Jie Ji
