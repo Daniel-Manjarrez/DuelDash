@@ -1,5 +1,5 @@
 # Microcontroller Final Project Duel Dash
-A 1v1 turned based wearable ESP32 device that acts as a video game controller with a game designed for a pair of ESP32 microcontrollers
+A 1v1 turned based wearable ESP32 device that acts as a controller with a game designed for a pair of ESP32 microcontrollers
 
 *Here's a video of the game and controller in action: https://youtu.be/tnQcMq5Ct8E?feature=shared*
 
