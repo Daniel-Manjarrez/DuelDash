@@ -11,6 +11,7 @@ You can take an in depth look at our process making this device and program in t
 
 - [Materials](#what-youll-need)
 - [Installation Process](#installation)
+- [Contributors](#contributors)
 
 ## What You'll Need
 
@@ -36,3 +37,7 @@ You can take an in depth look at our process making this device and program in t
 3. Once everything is set up, you can connect your ESP32 to your computer via USB-C and click on the `Upload` sketch button on the top left of the Arduino IDE after selecting your board and appropriate configurations. This will make the code compile and store onto the ESP32.
 
 4. Lastly, feel free to 3D print the STL files in the `EnclosureSTLFiles` folder to then assemble an enclosure for the controller's circuit with tape to resemble a traditional looking controller which can potentionally look like this:
+
+## Contributors
+
+- Daniel Manjarrez
