@@ -10,6 +10,7 @@ You can take an in depth look at our process making this device and program in t
 ## Table of Contents
 
 - [Materials](#what-youll-need)
+- [Installation Process](#installation)
 
 ## What You'll Need
 
