@@ -27,7 +27,7 @@ You can take an in depth look at our process making this device and program in t
 
 
 ## Installation
-1. Download the `GameControllerInput` folder and open the arduino sketch file inside named `GameControllerInput.ino` on Arduino IDE
+1. Download the `DualDash` folder and open the arduino sketch file inside named `DualDash.ino` on Arduino IDE
     * If Arduino IDE is not installed, check the [Arduino Support Page](https://support.arduino.cc/hc/en-us/articles/360019833020-Download-and-install-Arduino-IDE) to learn how to install it
 
 2. Set up your breadboard and components so that it follows the Fritzing diagram circuit configuration below:
