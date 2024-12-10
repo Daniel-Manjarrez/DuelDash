@@ -12,6 +12,7 @@ You can take an in depth look at our process making this device and program in t
 - [Materials](#what-youll-need)
 - [Installation Process](#installation)
 - [Contributors](#contributors)
+- [Design Process](#design-process-and-goals)
 
 ## What You'll Need
 
