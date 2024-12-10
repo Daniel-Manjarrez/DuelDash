@@ -38,6 +38,18 @@ You can take an in depth look at our process making this device and program in t
 
 4. Lastly, feel free to 3D print the STL files in the `EnclosureSTLFiles` folder to then assemble an enclosure for the controller's circuit with tape to resemble a watch looking controller which can potentionally look like this:
 
+
+## Design Process and Goals
+
+This game reference is the inspiration behind the game of my wearable ESP32 device that depicts a 1v1 gesture based gameplay by the players by configuring their choice of three attacks against their opponent which inspired me to make a 1v1 turned based game of attrition using quick hand interactions with an NFC reader.
+
+- Game Inspiration Reference:
+
+This image represents the inspiration behind creating the wearable controller for interacting with the game that is displayed on the screen on the player's wrist.
+
+- Controller Design Reference:
+
+
 ## Contributors
 
 - Daniel Manjarrez
