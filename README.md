@@ -50,6 +50,16 @@ This image represents the inspiration behind creating the wearable controller fo
 
 - Controller Design Reference:
 
+## Demos
+
+This image showcases the final game rendering of the interactive game program.
+
+- Final Result Static Image:
+
+This image showcases the animated motion of the final game rendering of the interactive game program.
+
+- Final Result Animated Image: 
+
 
 ## Contributors
 
