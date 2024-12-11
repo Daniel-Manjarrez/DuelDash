@@ -448,7 +448,7 @@ void checkGameOver() {
     }
   }
 
-  if (allAvatarsDead || noEnergyLeft) {
+  if (allAvatarsDead || energy <= 0) {
     endScreenState = LOSING_PLAYER;
     sendGameOver();
     currentScreen = END_SCREEN;
@@ -468,12 +468,6 @@ void sendGameOver() {
     message = "D: GAME_OVER_NONE";
   }
   broadcast(message);
-  Serial.println("Game Over message sent: " + message);
-}
-
-  // send the message using ESP-NOW broadcast
-  broadcast(message);
-
   Serial.println("Game Over message sent: " + message);
 }
 
