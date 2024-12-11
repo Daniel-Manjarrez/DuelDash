@@ -422,21 +422,69 @@ void drawGameScreen() {
     }
 }
 
+void checkGameOver() {
+  bool allAvatarsDead = true;
+  for (int i = 0; i < 3; i++) {
+    if (avatars[i].health > 0) {
+      allAvatarsDead = false;
+      break;
+    }
+  }
+
+  if (allAvatarsDead || noEnergyLeft) {
+    currentScreen = END_SCREEN;
+    endScreenState = PLAYER_B;
+    drawWinScreen();
+    sendGameOver();
+  }
+
+}
+
+void sendGameOver(){
+}
+
+void drawWinScreen() {
+  tft.fillScreen(TFT_BLACK); 
+  tft.setTextSize(3);
+  int16_t cursorX = 50;
+  int16_t cursorY = 55;
+  tft.setCursor(cursorX, cursorY);
+  
+  switch(endScreenState) {
+    case WINNING_PLAYER:
+      tft.setTextColor(TFT_GREEN); 
+      tft.println("You Win!");
+      break;
+    case LOSING_PLAYER:
+      tft.setTextColor(TFT_RED); 
+      tft.println("You Lose...");
+      break;
+    case PLAYER_NONE:
+      tft.println("Undefined");
+      break;
+
+    cursorY += 50;
+    tft.setCursor(cursorX, cursorY);
+    tft.println("Press Reset to Restart"); 
+  }
+}
+
 void loop() {
   switch (currentScreen) {
     case GAME_SCREEN:
       // Game logic here
       handleGameScreen();
-      // TODO: Handle Game Over Logic Here If Player's Avatar HP is <= 0 or Energy <= 0
-      // TODO: If game over, change currentScreen variable to END_SCREEN
-      // TODO: Game Over Logic should broadcast a message saying that Player
+      checkGameOver();
+      // DONE: Handle Game Over Logic Here If Player's Avatar HP is <= 0 or Energy <= 0 
+      // DONE: If game over, change currentScreen variable to END_SCREEN DONE
+      // TODO: Game Over Logic should broadcast a message saying that Player 
       // TODO: Lost, so that other Player know they Won.
       // TODO: Do this in a function called checkGameOver() with functions
       // TODO: like drawGameOver(), and (optionally; not needed in time for presentation
       // TODO: ) sendGameOver() contained inside.
       break;
     case END_SCREEN:
-      // handleWinScreen(); // To be written
+      // TODO: handleWinScreen(); // To be written
       break;
   }
   delay(100);
