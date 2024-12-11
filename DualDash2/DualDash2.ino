@@ -74,8 +74,8 @@ enum ScreenState {
 
 enum WinState {
   PLAYER_NONE,
-  PLAYER_A,
-  PLAYER_B,
+  WINNING_PLAYER,
+  LOSING_PLAYER,
 };
 
 ScreenState currentScreen = GAME_SCREEN;
@@ -131,6 +131,23 @@ void receiveCallback(const esp_now_recv_info_t *info, const uint8_t *data, int d
     }
     // xSemaphoreGive(mutex);
   // }
+
+      if (recvd.startsWith("D: GAME_OVER")) {
+        Serial.println("Game Over message received!");
+        currentScreen = END_SCREEN;
+
+        if (recvd == "D: GAME_OVER_LOSE") {
+          // If we receive LOSE from the other side, that means WE won.
+          endScreenState = WINNING_PLAYER;
+          currentScreen = END_SCREEN;
+          drawWinScreen(); // shows "You Win!"
+        } else if (recvd == "D: GAME_OVER_WIN") {
+          // If we receive WIN from the other side, that means WE lost.
+          endScreenState = LOSING_PLAYER;
+          currentScreen = END_SCREEN;
+          drawWinScreen(); // shows "You Lose..."
+        }
+      }
   delay(100);
 }
 
@@ -432,15 +449,32 @@ void checkGameOver() {
   }
 
   if (allAvatarsDead || noEnergyLeft) {
-    currentScreen = END_SCREEN;
-    endScreenState = PLAYER_B;
-    drawWinScreen();
+    endScreenState = LOSING_PLAYER;
     sendGameOver();
+    currentScreen = END_SCREEN;
+    drawWinScreen();
   }
 
 }
 
-void sendGameOver(){
+void sendGameOver() {
+  String message;
+  if (endScreenState == LOSING_PLAYER) {
+    // I lost, so the other must have won.
+    message = "D: GAME_OVER_LOSE"; 
+  } else if (endScreenState == WINNING_PLAYER) {
+    message = "D: GAME_OVER_WIN";
+  } else {
+    message = "D: GAME_OVER_NONE";
+  }
+  broadcast(message);
+  Serial.println("Game Over message sent: " + message);
+}
+
+  // send the message using ESP-NOW broadcast
+  broadcast(message);
+
+  Serial.println("Game Over message sent: " + message);
 }
 
 void drawWinScreen() {
