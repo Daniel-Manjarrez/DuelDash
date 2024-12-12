@@ -11,14 +11,11 @@
 
 PN532_I2C pn532i2c(Wire);
 PN532 nfc(pn532i2c);
-// #endif
 
 // TFT setup
 TFT_eSPI tft = TFT_eSPI();
 #define TFT_BLACK 0x0000
 #define TFT_WHITE 0xFFFF
-
-// SemaphoreHandle_t mutex;  // Declare a mutex handle
 
 // Constants
 #define SHORT_PRESS_TIME 500  // 500 milliseconds
@@ -30,11 +27,14 @@ TFT_eSPI tft = TFT_eSPI();
 #define LED_PIN 15         // LED to flash at milestone
 #define POTENTIOMETER_PIN 13         // Potentiometer to adjust game speed
 
+// Each Avatar consist of a tagID (if NFC Reader is being used)
+// and a healthbar
 struct Avatar {
     uint8_t tagID[7];  // Unique NFC tag ID
     int health;    // Health of the avatar
 };
 
+// Initialize all avatar states
 Avatar avatars[] = {
     {{0, 0, 0, 0, 0, 0, 0}, 100},  // Avatar 1 with 100 health
     {{0, 0, 0, 0, 0, 0, 0}, 100},  // Avatar 2 with 100 health
@@ -48,12 +48,8 @@ int lastButtonState = LOW;
 unsigned long pressedTime  = 0;
 unsigned long releasedTime = 0;
 
+// Zero Arr used for memcmp
 uint8_t zeroArr[7] = {0};
-
-struct AttackMessage {
-  uint8_t avatarID;    // ID of the attacked avatar
-  uint8_t attackPower; // Power of the incoming attack
-};
 
 // Game variables
 int currAvatarHealth = avatars[0].health; // Player's total energy
@@ -67,11 +63,13 @@ int attackEnergyPairInd = 0;
 
 int attackPower = attackPowerArr[attackEnergyPairInd];  // Current attack power
 
+// Screen States of DuelDash
 enum ScreenState {
   GAME_SCREEN,
   END_SCREEN
 };
 
+// Win State of Player denoted in END_SCREEN
 enum WinState {
   PLAYER_NONE,
   WINNING_PLAYER,
@@ -91,6 +89,7 @@ void handleGameScreen();
 void drawWinScreen();
 void handleWinScreen();
 
+// Broadcast an attack message from this esp32 to opponent's esp32 
 void sendAttackRequest() {
   String cmd1 = "D: A" + String(attackPower);  // Example: Attack command to the other player
   energy = max(0, energy - energyUsage[attackEnergyPairInd]);
@@ -99,8 +98,26 @@ void sendAttackRequest() {
   tft.fillScreen(TFT_BLACK);
 }
 
+// UNIMPLEMENTED: The idea was that the faster the esp32 sends an attack request
+// an attack will be boosted by some amount.
 void sendBoostRequest() {
   return;
+}
+
+// Send game over messages to ESP32 when game over is triggered by
+// either ESP32
+void sendGameOver() {
+  String message;
+  if (endScreenState == LOSING_PLAYER) {
+    // I lost, so the other must have won.
+    message = "D: GAME_OVER_LOSE"; 
+  } else if (endScreenState == WINNING_PLAYER) {
+    message = "D: GAME_OVER_WIN";
+  } else {
+    message = "D: GAME_OVER_NONE";
+  }
+  broadcast(message);
+  Serial.println("Game Over message sent: " + message);
 }
 
 void receiveCallback(const esp_now_recv_info_t *info, const uint8_t *data, int dataLen) {
@@ -114,6 +131,7 @@ void receiveCallback(const esp_now_recv_info_t *info, const uint8_t *data, int d
     
     char macStr[18];
 
+    // Handling decisions on attack based moves
     if (recvd[0] == 'D') {  // This is a command to reduce health or modify stats
       // If the received command is related to an attack, apply the attack
       if (recvd.substring(3, 4) == "A") {
@@ -132,31 +150,34 @@ void receiveCallback(const esp_now_recv_info_t *info, const uint8_t *data, int d
     // xSemaphoreGive(mutex);
   // }
 
-      if (recvd.startsWith("D: GAME_OVER")) {
-        Serial.println("Game Over message received!");
-        currentScreen = END_SCREEN;
+    // Handling decisions on game over messages
+    if (recvd.startsWith("D: GAME_OVER")) {
+      Serial.println("Game Over message received!");
+      currentScreen = END_SCREEN;
 
-        if (recvd == "D: GAME_OVER_LOSE") {
-          // If we receive LOSE from the other side, that means WE won.
-          endScreenState = WINNING_PLAYER;
-          currentScreen = END_SCREEN;
-          drawWinScreen(); // shows "You Win!"
-        } else if (recvd == "D: GAME_OVER_WIN") {
-          // If we receive WIN from the other side, that means WE lost.
-          endScreenState = LOSING_PLAYER;
-          currentScreen = END_SCREEN;
-          drawWinScreen(); // shows "You Lose..."
-        }
+      if (recvd == "D: GAME_OVER_LOSE") {
+        // If we receive LOSE from the other side, that means WE won.
+        endScreenState = WINNING_PLAYER;
+        currentScreen = END_SCREEN;
+        drawWinScreen(); // shows "You Win!"
+      } else if (recvd == "D: GAME_OVER_WIN") {
+        // If we receive WIN from the other side, that means WE lost.
+        endScreenState = LOSING_PLAYER;
+        currentScreen = END_SCREEN;
+        drawWinScreen(); // shows "You Lose..."
       }
+    }
   delay(100);
 }
 
+// Send callback used for debugging
 void sentCallback(const uint8_t *macAddr, esp_now_send_status_t status) {
   // Optional: Handle send status
   Serial.println("ESP32 broadcasted a message!");
   return;
 }
 
+// Broadcast messages to all esp32
 void broadcast(const String &message)
 {
   uint8_t broadcastAddress[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
@@ -168,7 +189,7 @@ void broadcast(const String &message)
   esp_now_send(broadcastAddress, (const uint8_t *)message.c_str(), message.length());
 }
 
-
+// Set up ESP NOW 
 void espnowSetup() {
 // Set ESP32 in STA mode
   delay(500);
@@ -191,6 +212,7 @@ void espnowSetup() {
   }
 }
 
+// Set up display screen text
 void textSetup() {
   // Initialize TFT display
   tft.init();  // Init ST7789 with 240x240 resolution
@@ -200,12 +222,15 @@ void textSetup() {
   tft.setTextSize(2);
 }
 
+// Set up hardware pin input
 void buttonSetup() {
   // Initialize hardware pins
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   pinMode(BUTTON_LEFT, INPUT_PULLUP);
   pinMode(BUTTON_RIGHT, INPUT_PULLUP);
 }
+
+// Call all set up functions
 void setup() {
   Serial.begin(115200);
 
@@ -216,6 +241,7 @@ void setup() {
 
 }
 
+// Reads and recognizes the NFC tag that hovers over/under the NFC reader
 void readNFCTag() {
   boolean success;
   // Buffer to store the UID
@@ -284,6 +310,7 @@ void readNFCTag() {
   }
 }
 
+// Connect to the NFC Reader attached to the ESP32
 bool connect() {
   
   nfc.begin();
@@ -315,9 +342,12 @@ bool connect() {
   return true;
 }
 
+// Detect hardware inputs from the ESP32 buttons, NFC tags (optional
+// if NFC Reader is set up for the ESP32), and perform actions accordingly
 void detectInputs(){
   // Potentiometer isn't working so can't test this code
   // out even though it theoretically works :(
+
   // int potValue = analogRead(POTENTIOMETER_PIN);
   // int atkVal = map(potValue, 0, 4095, 1, maxAttackPower);
   // Serial.println("Potentiometer value is: " + String(potValue));
@@ -402,6 +432,8 @@ void detectInputs(){
   lastButtonState = buttonState;
 }
 
+// Calls on the display of the game screen
+// and calls detection of control inputs
 void handleGameScreen() {
   drawGameScreen();
   detectInputs();
@@ -412,6 +444,7 @@ void handleGameScreen() {
   }
 }
 
+// Draws the display of the game screen
 void drawGameScreen() {
     int16_t cursorX = 10;
     int16_t cursorY = 10;
@@ -439,6 +472,9 @@ void drawGameScreen() {
     }
 }
 
+// Checks if the conditions of a game being over
+// has been triggered by the esp32 (an avatar dies
+// or no more energy)
 void checkGameOver() {
   bool avatarLost = false;
   for (int i = 0; i < 3; i++) {
@@ -460,20 +496,7 @@ void checkGameOver() {
 
 }
 
-void sendGameOver() {
-  String message;
-  if (endScreenState == LOSING_PLAYER) {
-    // I lost, so the other must have won.
-    message = "D: GAME_OVER_LOSE"; 
-  } else if (endScreenState == WINNING_PLAYER) {
-    message = "D: GAME_OVER_WIN";
-  } else {
-    message = "D: GAME_OVER_NONE";
-  }
-  broadcast(message);
-  Serial.println("Game Over message sent: " + message);
-}
-
+// Draws the display of the Win Screen
 void drawWinScreen() {
   tft.fillScreen(TFT_BLACK); 
   tft.setTextSize(3);
@@ -500,6 +523,7 @@ void drawWinScreen() {
   }
 }
 
+// Loops the drawing and handling of the game and its inputs.
 void loop() {
   switch (currentScreen) {
     case GAME_SCREEN:
