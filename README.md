@@ -41,7 +41,7 @@ You can take an in depth look at our process making this device and program in t
 ![Connection Shown](Media/IDE.png)
 
 4. Lastly, feel free to 3D print the STL files in the `EnclosureSTLFiles` folder to then assemble an enclosure for the controller's circuit with tape to resemble a watch looking controller which can potentionally look like this:
-<img src="Media/OverviewImage.png" style="transform: rotate(90deg);">
+<img src="Media/OverviewImage.png" style="transform: rotate(180deg);">
 
 ## Design Process and Goals
 
