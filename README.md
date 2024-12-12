@@ -62,6 +62,7 @@ This image represents the inspiration behind creating the wearable controller fo
 This image showcases the final game rendering of the interactive game program.
 
 - Final Result Static Image:
+![Final Result](Media/OverviewImage.png)
 
 This image showcases the animated motion of the final game rendering of the interactive game program.
 
