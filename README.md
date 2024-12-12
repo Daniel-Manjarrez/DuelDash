@@ -68,6 +68,7 @@ This image showcases the animated motion of the final game rendering of the inte
 
 - Final Result Animated Image: 
 
+  ![Final Animation](Media/Rotating.gif)
 
 ## Contributors
 
