@@ -98,12 +98,6 @@ void sendAttackRequest() {
   tft.fillScreen(TFT_BLACK);
 }
 
-// UNIMPLEMENTED: The idea was that the faster the esp32 sends an attack request
-// an attack will be boosted by some amount.
-void sendBoostRequest() {
-  return;
-}
-
 // Send game over messages to ESP32 when game over is triggered by
 // either ESP32
 void sendGameOver() {
@@ -121,7 +115,6 @@ void sendGameOver() {
 }
 
 void receiveCallback(const esp_now_recv_info_t *info, const uint8_t *data, int dataLen) {
-  // if (xSemaphoreTake(mutex, portMAX_DELAY)) {  // Take the mutex
     char buffer[ESP_NOW_MAX_DATA_LEN + 1];
     int msgLen = min(ESP_NOW_MAX_DATA_LEN, dataLen);
     strncpy(buffer, (const char *)data, msgLen);
@@ -147,8 +140,6 @@ void receiveCallback(const esp_now_recv_info_t *info, const uint8_t *data, int d
         tft.fillScreen(TFT_BLACK);
       }
     }
-    // xSemaphoreGive(mutex);
-  // }
 
     // Handling decisions on game over messages
     if (recvd.startsWith("D: GAME_OVER")) {
@@ -238,7 +229,6 @@ void setup() {
   textSetup();
   buttonSetup();
   espnowSetup();
-
 }
 
 // Reads and recognizes the NFC tag that hovers over/under the NFC reader
@@ -249,9 +239,7 @@ void readNFCTag() {
   // UID size (4 or 7 bytes depending on card type)
   uint8_t uidLength;
 
-  // while (!connected) {
   connected = connect();
-  // }
 
   if (connected == false) {
     return;
@@ -345,20 +333,6 @@ bool connect() {
 // Detect hardware inputs from the ESP32 buttons, NFC tags (optional
 // if NFC Reader is set up for the ESP32), and perform actions accordingly
 void detectInputs(){
-  // Potentiometer isn't working so can't test this code
-  // out even though it theoretically works :(
-
-  // int potValue = analogRead(POTENTIOMETER_PIN);
-  // int atkVal = map(potValue, 0, 4095, 1, maxAttackPower);
-  // Serial.println("Potentiometer value is: " + String(potValue));
-  // Serial.println("Attack value is " + String(atkVal));
-  
-  // if (attackPower != atkVal) {
-  //   attackPower = atkVal;
-  //   tft.fillScreen(TFT_BLACK);
-  //   Serial.println("Potentiometer Value has changed.");
-  // }
-
   int currentLeftState = digitalRead(BUTTON_LEFT);
   // Detect left button press
   if (lastLeftState == HIGH && currentLeftState == LOW)       // button is pressed
@@ -493,7 +467,6 @@ void checkGameOver() {
     broadcast(message);
     drawWinScreen();
   }
-
 }
 
 // Draws the display of the Win Screen
@@ -530,16 +503,8 @@ void loop() {
       // Game logic here
       handleGameScreen();
       checkGameOver();
-      // DONE: Handle Game Over Logic Here If Player's Avatar HP is <= 0 or Energy <= 0 
-      // DONE: If game over, change currentScreen variable to END_SCREEN DONE
-      // DONE: Game Over Logic should broadcast a message saying that Player 
-      // DONE: Lost, so that other Player know they Won.
-      // DONE: Do this in a function called checkGameOver() with functions
-      // DONE: like drawGameOver(), and (optionally; not needed in time for presentation
-      // DONE: ) sendGameOver() contained inside.
       break;
     case END_SCREEN:
-      // DONE: handleWinScreen(); // To be written
       break;
   }
   delay(100);
