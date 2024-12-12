@@ -46,7 +46,7 @@ You can take an in depth look at our process making this device and program in t
 
 ## Design Process and Goals
 
-This game reference is the inspiration behind the game of my wearable ESP32 device that depicts a 1v1 gesture based gameplay by the players by configuring their choice of three attacks against their opponent which inspired me to make a 1v1 turned based game of attrition using quick hand interactions with an NFC reader.
+This game reference is the inspiration behind the game of my wearable ESP32 device that depicts 1v1 gesture based gameplay by the players by configuring their choice of three attacks against their opponent which inspired me to make a 1v1 turned based game of attrition using quick hand interactions with an NFC reader.
 
 - Game Inspiration Reference:
 
