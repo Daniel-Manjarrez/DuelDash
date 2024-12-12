@@ -35,7 +35,7 @@ You can take an in depth look at our process making this device and program in t
 1. Download the `DualDash` folder and open the arduino sketch file inside named `DualDash.ino` on Arduino IDE
     * If Arduino IDE is not installed, check the [Arduino Support Page](https://support.arduino.cc/hc/en-us/articles/360019833020-Download-and-install-Arduino-IDE) to learn how to install it
 
-2. Set up your breadboard and components so that it follows the Fritzing diagram circuit configuration below:
+2. Set up your breadboard and components so that it follows the Fritzing diagram circuit configuration below:![Connection Shown](Media/FinalProjectFritizingDiagram.png)
 
 3. Once everything is set up, you can connect your ESP32 to your computer via USB-C and click on the `Upload` sketch button on the top left of the Arduino IDE after selecting your board and appropriate configurations. This will make the code compile and store onto the ESP32. Repeat this again for a second ESP32.
 
