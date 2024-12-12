@@ -3,6 +3,9 @@ A 1v1 turned based wearable ESP32 device that acts as a controller with a game d
 
 *Here's a video of the game and controller in action: https://youtu.be/tnQcMq5Ct8E?feature=shared*
 
+![Final Animation](Media/Rotating.gif)
+![Final Animation](Media/ButtonPressing.gif)
+
 ## Blog Post
 
 You can take an in depth look at our process making this device and program in this blog [post](https://brassy-moonflower-6cd.notion.site/Dual-Dash-D2-15718fb9102d80f58f3fcc89c223d774?pvs=4)
