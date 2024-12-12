@@ -55,6 +55,8 @@ This image represents the inspiration behind creating the wearable controller fo
 
 - Controller Design Reference:
 
+  ![Rock Paper Scissors](Media/watch.jpg)
+
 ## Demos
 
 This image showcases the final game rendering of the interactive game program.
