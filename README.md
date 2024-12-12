@@ -49,6 +49,8 @@ This game reference is the inspiration behind the game of my wearable ESP32 devi
 
 - Game Inspiration Reference:
 
+  ![Fruit Ninja](Media/rps.png)
+
 This image represents the inspiration behind creating the wearable controller for interacting with the game that is displayed on the screen on the player's wrist.
 
 - Controller Design Reference:
