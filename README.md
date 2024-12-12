@@ -5,6 +5,7 @@ A 1v1 turned based wearable ESP32 device that acts as a controller with a game d
 
 ![Final Animation](Media/Rotating.gif)
 ![Final Animation](Media/ButtonPressing.gif)
+![Final Animation](Media/pvp.gif)
 
 ## Blog Post
 
