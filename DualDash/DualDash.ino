@@ -134,9 +134,6 @@ void receiveCallback(const esp_now_recv_info_t *info, const uint8_t *data, int d
         if (avatars[currAvatarInd].health  < 0) avatars[currAvatarInd].health  = 0;  // Ensure health doesn't go below 0
         tft.fillScreen(TFT_BLACK);
       } else if (recvd.substring(3) == "B") {
-        // Handle another attack type
-        // attackStrength += 1;  // Example logic for another type of attack
-        // redrawControls();  // Redraw to show updated attack strength
         tft.fillScreen(TFT_BLACK);
       }
     }
